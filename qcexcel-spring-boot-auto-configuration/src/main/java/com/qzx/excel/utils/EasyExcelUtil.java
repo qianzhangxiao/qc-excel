@@ -2,9 +2,13 @@ package com.qzx.excel.utils;
 
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
+import com.alibaba.excel.enums.WriteDirectionEnum;
 import com.alibaba.excel.support.ExcelTypeEnum;
 import com.alibaba.excel.write.metadata.WriteSheet;
+import com.alibaba.excel.write.metadata.fill.FillConfig;
+import com.alibaba.excel.write.metadata.fill.FillWrapper;
 import com.qzx.excel.listener.ExcelReadListener;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.ObjectUtils;
 
@@ -15,12 +19,10 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * @description: easyExcel工具类
@@ -165,5 +167,40 @@ public class EasyExcelUtil {
                 .registerWriteHandler(new SelfWriteHandle(map))
                 .sheet(sheetName)
                 .doWrite(new ArrayList<>());
+    }
+
+    /**
+     * 复杂模板导出
+     * @param importFile 导入模板，包含路径及名称，如/static/test.xlsx
+     * @param exportFileName 导出的文件名称
+     * @param sheetName sheet名称
+     * @param response 返回响应
+     * @param importContent 模板所需数据
+     */
+    public static boolean complexExport(String importFile,String exportFileName,String sheetName,HttpServletResponse response,Map<String,Object> importContent){
+        InputStream file=IOUtil.getInputStreamFromClassPath(importFile);
+        response.setContentType("application/vnd.ms-excel");
+        response.setCharacterEncoding("utf-8");
+        ExcelWriter writer= null;
+        try {
+            writer = EasyExcel.write(EasyExcelUtil.getOutPutStream(response,exportFileName)).withTemplate(file).build();
+            WriteSheet writeSheet=EasyExcel.writerSheet(0,"网络调度").registerWriteHandler(new MyHeader()).build();
+            FillConfig fillConfig=FillConfig.builder().direction(WriteDirectionEnum.VERTICAL).forceNewRow(Boolean.TRUE).build();
+            ExcelWriter finalWriter = writer;
+            importContent.forEach((k, v)->{
+                if (v instanceof Map){
+                    finalWriter.fill(v,fillConfig,writeSheet);
+                }
+                if (v instanceof Collection<?>){
+                    finalWriter.fill(new FillWrapper(k, (Collection<?>)v ),fillConfig,writeSheet);
+                }
+            });
+            writer.finish();
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+
     }
 }
