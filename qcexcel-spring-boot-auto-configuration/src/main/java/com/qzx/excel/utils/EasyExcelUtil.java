@@ -8,6 +8,7 @@ import com.alibaba.excel.write.metadata.WriteSheet;
 import com.alibaba.excel.write.metadata.fill.FillConfig;
 import com.alibaba.excel.write.metadata.fill.FillWrapper;
 import com.qzx.excel.listener.ExcelReadListener;
+import javafx.collections.FXCollections;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.ObjectUtils;
 
@@ -15,6 +16,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -143,7 +145,7 @@ public class EasyExcelUtil {
 
     /*浏览器下载文件*/
     public static OutputStream getOutPutStream(HttpServletResponse response,String fileName) throws IOException {
-        String exportFileName=URLEncoder.encode(fileName+ ExcelTypeEnum.XLS.getValue(), StandardCharsets.UTF_8.toString());
+        String exportFileName=URLEncoder.encode(fileName+ ExcelTypeEnum.XLSX.getValue(), StandardCharsets.UTF_8.toString());
         response.setContentType("application/force-download");
         response.setHeader("Content-Disposition","attachment;fileName="+exportFileName);
         return response.getOutputStream();
@@ -155,35 +157,93 @@ public class EasyExcelUtil {
      * @param map 需要添加下拉菜单的列，列从0开始,value-->String[]为具体下拉菜单的值
      */
     public static<T> void exportTemplate(HttpServletResponse response,String templateName,String sheetName,T t,Map<Integer,String[]> map) throws IOException {
-        response.setContentType("application/vnd.ms-excel");
-        response.setCharacterEncoding("utf-8");
-        String fileName = URLEncoder.encode(templateName, "UTF-8");
-        response.setHeader("content-disposition", "attachment;filename=" + fileName + ".xlsx");
-        EasyExcel.write(response.getOutputStream(), t.getClass())
+        EasyExcel.write(getOutPutStream(response,templateName), t.getClass())
                 .registerWriteHandler(new SelfWriteHandle(map))
                 .sheet(sheetName)
                 .doWrite(new ArrayList<>());
     }
 
     /**
-     * 复杂模板导出
+     * 按文件模板导出
+     * @param response
+     * @param templateName 导出模板名称
+     * @param sheetName sheet名称
+     * @param templateStream 模板文件数据流
+     * @param fillData 填充数据
+     */
+    public static void exportTemplateWithFile(HttpServletResponse response,String templateName,String sheetName,
+                                              InputStream templateStream,Map<Integer,String[]> fillData) throws IOException {
+        EasyExcel.write(getOutPutStream(response,templateName))
+                .withTemplate(templateStream)
+                .registerWriteHandler(new SelfWriteHandle(fillData))
+                .sheet(sheetName)
+                .doWrite(new ArrayList<>());
+    }
+    /**
+     * 按文件模板导出
+     * @param response
+     * @param templateName 导出模板名称
+     * @param sheetName sheet名称
+     * @param templateFile 模板文件
+     * @param fillData 填充数据
+     */
+    public static void exportTemplateWithFile(HttpServletResponse response,String templateName,String sheetName,
+                                              String templateFile,Map<Integer,String[]> fillData) throws IOException {
+        InputStream templateStream=IOUtil.getInputStreamFromClassPath(templateFile);
+        exportTemplateWithFile(response,templateName,sheetName,templateStream,fillData);
+    }
+    /**
+     * 单sheet页复杂模板导出
      * @param importFile 导入模板，包含路径及名称，如/static/test.xlsx
      * @param exportFileName 导出的文件名称
      * @param sheetName sheet名称
      * @param response 返回响应
      * @param importContent 模板所需数据
      */
-    public static boolean complexExport(String importFile,String exportFileName,String sheetName,HttpServletResponse response,Map<String,Object> importContent){
-        InputStream file=IOUtil.getInputStreamFromClassPath(importFile);
-        response.setContentType("application/vnd.ms-excel");
-        response.setCharacterEncoding("utf-8");
+    public static boolean complexExport(InputStream importFile,String exportFileName,String sheetName,HttpServletResponse response,Map<String,Object> importContent) throws IOException {
+        return complexExport(importFile,exportFileName,sheetName,getOutPutStream(response,exportFileName),importContent);
+    }
+    /**
+     * 单sheet页复杂模板导出
+     * @param importFile 导入模板，包含路径及名称，如/static/test.xlsx
+     * @param exportFileName 导出的文件名称
+     * @param sheetName sheet名称
+     * @param outputStream 输出流
+     * @param importContent 模板所需数据
+     */
+    public static boolean complexExport(InputStream importFile,String exportFileName,String sheetName,OutputStream outputStream,Map<String,Object> importContent){
         ExcelWriter writer= null;
-        try {
-            writer = EasyExcel.write(EasyExcelUtil.getOutPutStream(response,exportFileName)).withTemplate(file).build();
-            WriteSheet writeSheet=EasyExcel.writerSheet(0,sheetName).registerWriteHandler(new MyHeader()).build();
+        writer = EasyExcel.write(outputStream).withTemplate(importFile).build();
+        WriteSheet writeSheet=EasyExcel.writerSheet(0,sheetName).registerWriteHandler(new MyHeader()).build();
+        FillConfig fillConfig=FillConfig.builder().direction(WriteDirectionEnum.VERTICAL).forceNewRow(Boolean.TRUE).build();
+        ExcelWriter finalWriter = writer;
+        importContent.forEach((k, v)->{
+            if (v instanceof Map){
+                finalWriter.fill(v,fillConfig,writeSheet);
+            }
+            if (v instanceof Collection<?>){
+                finalWriter.fill(new FillWrapper(k, (Collection<?>)v ),fillConfig,writeSheet);
+            }
+        });
+        writer.finish();
+        return true;
+    }
+
+    /**
+     * 多sheet页复杂模板导出
+     * @param importFile 导入模板，包含路径及名称，如/static/test.xlsx
+     * @param exportFileName 导出的文件名称
+     * @param outputStream 输出流
+     * @param importContent key为sheet页码，从0开始，value为sheet页填充所需数据
+     */
+    public static boolean complexExportMoreSheet(InputStream importFile,String exportFileName,OutputStream outputStream,Map<Integer,Map<String,Object>> importContent){
+        ExcelWriter writer= null;
+        writer = EasyExcel.write(outputStream).withTemplate(importFile).build();
+        ExcelWriter finalWriter = writer;
+        importContent.forEach((sheetNo, sheetContent)->{
+            WriteSheet writeSheet=EasyExcel.writerSheet(sheetNo).registerWriteHandler(new MyHeader()).build();
             FillConfig fillConfig=FillConfig.builder().direction(WriteDirectionEnum.VERTICAL).forceNewRow(Boolean.TRUE).build();
-            ExcelWriter finalWriter = writer;
-            importContent.forEach((k, v)->{
+            sheetContent.forEach((k, v)->{
                 if (v instanceof Map){
                     finalWriter.fill(v,fillConfig,writeSheet);
                 }
@@ -191,12 +251,67 @@ public class EasyExcelUtil {
                     finalWriter.fill(new FillWrapper(k, (Collection<?>)v ),fillConfig,writeSheet);
                 }
             });
-            writer.finish();
-            return true;
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
-        }
-
+        });
+        writer.finish();
+        return true;
     }
+
+    /**
+     * 多sheet页复杂模板导出
+     * @param importFile 导入模板，包含路径及名称，如/static/test.xlsx
+     * @param exportFileName 导出的文件名称
+     * @param response 输出流
+     * @param importContent key为sheet页码，从0开始，value为sheet页填充所需数据
+     */
+    public static boolean complexExportMoreSheet(InputStream importFile,String exportFileName,HttpServletResponse response,Map<Integer,Map<String,Object>> importContent) throws IOException {
+        return complexExportMoreSheet(importFile,exportFileName,getOutPutStream(response,exportFileName),importContent);
+    }
+
+    /**
+     * 单sheet页复杂模板导出，模板位于项目classpath环境下
+     * @param importFile 导入模板，包含路径及名称，如/static/test.xlsx
+     * @param exportFileName 导出的文件名称
+     * @param sheetName sheet名称
+     * @param response 返回响应
+     * @param importContent 模板所需数据
+     */
+    public static boolean complexExport(String importFile,String exportFileName,String sheetName,HttpServletResponse response,Map<String,Object> importContent) throws IOException {
+        InputStream file=IOUtil.getInputStreamFromClassPath(importFile);
+        return complexExport(file,exportFileName,sheetName,response,importContent);
+    }
+    /**
+     * 单sheet页复杂模板导出，模板位于项目classpath环境下
+     * @param importFile 导入模板，包含路径及名称，如/static/test.xlsx
+     * @param exportFileName 导出的文件名称
+     * @param sheetName sheet名称
+     * @param outputStream 输出流
+     * @param importContent 模板所需数据
+     */
+    public static boolean complexExport(String importFile,String exportFileName,String sheetName,OutputStream outputStream,Map<String,Object> importContent){
+        InputStream file=IOUtil.getInputStreamFromClassPath(importFile);
+        return complexExport(file,exportFileName,sheetName,outputStream,importContent);
+    }
+    /**
+     * 多sheet页复杂模板导出，模板位于项目classpath环境下
+     * @param importFile 导入模板，包含路径及名称，如/static/test.xlsx
+     * @param exportFileName 导出的文件名称
+     * @param response 返回响应
+     * @param importContent key为sheet页码，从0开始，value为sheet页填充所需数据
+     */
+    public static boolean complexExportMoreSheet(String importFile,String exportFileName,HttpServletResponse response,Map<Integer,Map<String,Object>> importContent) throws IOException {
+        InputStream file=IOUtil.getInputStreamFromClassPath(importFile);
+        return complexExportMoreSheet(file,exportFileName,response,importContent);
+    }
+    /**
+     * 多sheet页复杂模板导出，模板位于项目classpath环境下
+     * @param importFile 导入模板，包含路径及名称，如/static/test.xlsx
+     * @param exportFileName 导出的文件名称
+     * @param outputStream 输出流
+     * @param importContent key为sheet页码，从0开始，value为sheet页填充所需数据
+     */
+    public static boolean complexExportMoreSheet(String importFile,String exportFileName,OutputStream outputStream,Map<Integer,Map<String,Object>> importContent){
+        InputStream file=IOUtil.getInputStreamFromClassPath(importFile);
+        return complexExportMoreSheet(file,exportFileName,outputStream,importContent);
+    }
+
 }
