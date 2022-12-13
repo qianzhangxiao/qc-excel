@@ -15,6 +15,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -165,6 +166,38 @@ public class EasyExcelUtil {
                 .doWrite(new ArrayList<>());
     }
 
+    /**
+     * 按文件模板导出
+     * @param response
+     * @param templateName 导出模板名称
+     * @param sheetName sheet名称
+     * @param templateStream 模板文件数据流
+     * @param fillData 填充数据
+     */
+    public static void exportTemplateWithFile(HttpServletResponse response,String templateName,String sheetName,InputStream templateStream,Map<Integer,String[]> fillData) throws IOException {
+        response.setContentType("application/vnd.ms-excel");
+        response.setCharacterEncoding("utf-8");
+        String fileName = URLEncoder.encode(templateName, "UTF-8");
+        response.setHeader("content-disposition", "attachment;filename=" + fileName + ".xlsx");
+        EasyExcel.write(response.getOutputStream())
+                .withTemplate(templateStream)
+                .registerWriteHandler(new SelfWriteHandle(fillData))
+                .sheet(sheetName)
+                .doWrite(new ArrayList<>());
+    }
+    /**
+     * 按文件模板导出
+     * @param response
+     * @param templateName 导出模板名称
+     * @param sheetName sheet名称
+     * @param templateFile 模板文件
+     * @param fillData 填充数据
+     * @param <T>
+     */
+    public static void exportTemplateWithFile(HttpServletResponse response,String templateName,String sheetName,String templateFile,Map<Integer,String[]> fillData) throws IOException {
+        InputStream templateStream=IOUtil.getInputStreamFromClassPath(templateFile);
+        exportTemplateWithFile(response,templateName,sheetName,templateStream,fillData);
+    }
     /**
      * 复杂模板导出
      * @param importFile 导入模板，包含路径及名称，如/static/test.xlsx
