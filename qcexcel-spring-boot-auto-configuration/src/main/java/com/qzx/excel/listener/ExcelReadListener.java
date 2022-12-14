@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @description:
+ * @description: excel导入监听类，需要为单sheet页，多sheet页会导致数据导入重复
  * @author: qc
  * @time: 2021/5/25 11:14
  */
@@ -21,12 +21,22 @@ import java.util.Map;
 public class ExcelReadListener<T> extends AnalysisEventListener<T> {
 
     private Class<?> s;
-    /*调用的service方法名*/
+    /**
+     * 调用的service方法名
+     * */
     private String methodName;
 
-    /*反射调用方法的其他条件，使用map封装*/
+    /**
+     * 反射调用方法的其他条件，使用map封装
+     * */
     private Map<String,Object> map;
 
+    /**
+     *
+     * @param s 被调用方法的对象（需要被spring托管）
+     * @param methodName 被调用的方法名（public修饰）
+     * @param map 调用方法的额外条件
+     */
     public ExcelReadListener(Class<?> s, String methodName, Map<String,Object> map){
         this.s=s;
         this.methodName=methodName;
