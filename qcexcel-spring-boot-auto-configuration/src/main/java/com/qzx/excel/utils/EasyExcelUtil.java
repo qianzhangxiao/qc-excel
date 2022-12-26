@@ -9,7 +9,6 @@ import com.alibaba.excel.write.metadata.fill.FillConfig;
 import com.alibaba.excel.write.metadata.fill.FillWrapper;
 import com.qzx.excel.excel.ExcelException;
 import com.qzx.excel.listener.ExcelReadListener;
-import javafx.collections.FXCollections;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.ObjectUtils;
 
@@ -17,7 +16,6 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -153,7 +151,8 @@ public class EasyExcelUtil {
     /*浏览器下载文件*/
     public static OutputStream getOutPutStream(HttpServletResponse response,String fileName) throws IOException {
         String exportFileName=URLEncoder.encode(fileName+ ExcelTypeEnum.XLSX.getValue(), StandardCharsets.UTF_8.toString());
-        response.setContentType("application/force-download");
+        response.setContentType("application/vnd.ms-excel");
+        response.setCharacterEncoding("utf-8");
         response.setHeader("Content-Disposition","attachment;fileName="+exportFileName);
         return response.getOutputStream();
     }
