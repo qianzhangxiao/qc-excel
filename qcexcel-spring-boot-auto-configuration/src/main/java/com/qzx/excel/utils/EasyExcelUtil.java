@@ -7,6 +7,7 @@ import com.alibaba.excel.support.ExcelTypeEnum;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.alibaba.excel.write.metadata.fill.FillConfig;
 import com.alibaba.excel.write.metadata.fill.FillWrapper;
+import com.qzx.excel.excel.ExcelException;
 import com.qzx.excel.listener.ExcelReadListener;
 import javafx.collections.FXCollections;
 import lombok.extern.slf4j.Slf4j;
@@ -104,19 +105,22 @@ public class EasyExcelUtil {
      * @author: qc
      * @time: 2021/5/25 14:01
      */
-    public static <T> boolean importExcel(InputStream file,Class<?> s,String methodName,Class<T> tClass,Map<String,Object> condition){
+    public static <T> boolean importExcel(InputStream file,Class<?> s,String methodName,Class<T> tClass,Map<String,Object> condition) throws Exception {
         try{
             log.info("开始解析excel文件");
             // 这里 需要指定读用哪个class去读，然后读取第一个sheet 文件流会自动关闭
             // EasyExcel.read(fileName, DemoData.class, new DemoDataListener()).sheet().doRead();
             /*doReadAll()读取所有sheet页*/
-            EasyExcel.read(file,tClass,new ExcelReadListener<T>(s,methodName,condition)).doReadAll();
+            EasyExcel.read(file,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass)).doReadAll();
             log.info("解析excel文件成功");
             return true;
-        }catch (Exception e){
+        }catch (ExcelException e){
+          log.error("导入模板有误");
+          throw new ExcelException(e.getMessage());
+        } catch (Exception e){
             e.printStackTrace();
             log.error("解析excel文件异常");
-            return false;
+            throw new Exception("文件解析异常，只支持xlsx/xsl格式");
         }finally {
             if(file!=null){
                 try {
@@ -127,19 +131,22 @@ public class EasyExcelUtil {
             }
         }
     }
-    public static <T> boolean importExcel(String fileName,Class<?> s,String methodName,Class<T> tClass,Map<String,Object> condition){
+    public static <T> boolean importExcel(String fileName,Class<?> s,String methodName,Class<T> tClass,Map<String,Object> condition) throws Exception {
         try{
             log.info("开始解析excel文件");
             // 这里 需要指定读用哪个class去读，然后读取第一个sheet 文件流会自动关闭
             // EasyExcel.read(fileName, DemoData.class, new DemoDataListener()).sheet().doRead();
             /*doReadAll()读取所有sheet页*/
-            EasyExcel.read(fileName,tClass,new ExcelReadListener<T>(s,methodName,condition)).doReadAll();
+            EasyExcel.read(fileName,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass)).doReadAll();
             log.info("解析excel文件成功");
-            return false;
-        }catch (Exception e){
+            return true;
+        }catch (ExcelException e){
+            log.error("导入模板有误");
+            throw new ExcelException(e.getMessage());
+        } catch (Exception e){
             e.printStackTrace();
             log.error("解析excel文件异常");
-            return true;
+            throw new Exception("文件解析异常，只支持xlsx/xsl格式");
         }
     }
 
