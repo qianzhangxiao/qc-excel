@@ -16,6 +16,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -28,7 +29,15 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
 
     private Class<?> s;
 
+    /**
+    * 模板类对象
+    * */
     private Class<T> t;
+
+    /**
+     * 模板头--校验模板是否正确
+     */
+    Map<Integer,String > templateHeaderMap;
     /**
      * 调用的service方法名
      * */
@@ -38,6 +47,20 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
      * 反射调用方法的其他条件，使用map封装
      * */
     private Map<String,Object> map;
+
+
+    /**
+     * 每隔BATCH_COUNT条存储数据库，实际使用中可以3000条，然后清理list ，方便内存回收
+     */
+    private static final int BATCH_COUNT = 5;
+    /**
+     * 导入总量
+     */
+    private AtomicInteger totalCount = new AtomicInteger(0);
+    /**
+     * 保存导入的数据
+     */
+    List<T> list = new ArrayList<>();
 
     /**
      *
@@ -52,11 +75,18 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
         this.t = t;
     }
     /**
-     * 每隔5条存储数据库，实际使用中可以3000条，然后清理list ，方便内存回收
+     *
+     * @param s 被调用方法的对象（需要被spring托管）
+     * @param methodName 被调用的方法名（public修饰）
+     * @param map 调用方法的额外条件
      */
-    private static final int BATCH_COUNT = 5;
-    private AtomicInteger totalCount = new AtomicInteger(0);
-    List<T> list = new ArrayList<>();
+    public ExcelReadListener(Class<?> s, String methodName, Map<String,Object> map,Class<T> t,Map<Integer,String> templateHeaderMap){
+        this.s=s;
+        this.methodName=methodName;
+        this.map=map;
+        this.t = t;
+        this.templateHeaderMap = templateHeaderMap;
+    }
 
 
     /**
@@ -66,6 +96,25 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
      */
     @Override
     public void invokeHeadMap(Map<Integer, String> headMap, AnalysisContext context) {
+        if (!ObjectUtils.isEmpty(templateHeaderMap)){
+            headerMapJudge(headMap);
+        }else{
+            headerFieldJudge(headMap);
+        }
+    }
+
+    private void headerMapJudge(Map<Integer,String >headMap){
+        if (!Objects.equals(headMap.size(),templateHeaderMap.size())){
+            throw new ExcelException("模板错误，请检查导入模板");
+        }
+        headMap.forEach((k,v)->{
+            if (!Objects.equals(v,templateHeaderMap.get(k))){
+                throw new ExcelException("模板错误，请检查导入模板");
+            }
+        });
+    }
+
+    private void headerFieldJudge(Map<Integer,String >headMap){
         // 获取数据实体的字段列表
         Field[] fields = t.getDeclaredFields();
         // 遍历字段进行判断
@@ -87,13 +136,15 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
         }
     }
 
-    /*这个每一条数据解析都会来调用*/
+    /**
+     * 这个每一条数据解析都会来调用
+     * */
     @Override
     public void invoke(T t, AnalysisContext analysisContext) {
         try{
             totalCount.incrementAndGet();
             list.add(t);
-            if(list.size()>=BATCH_COUNT){
+            if(list.size()>=BATCH_COUNT){ //满BATCH_COUNT处理一次，分批次处理减轻压力
                 invokeMethod();
                 // 存储完成清理 list
                 list.clear();
@@ -104,14 +155,20 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
         }
     }
 
-    /*所有数据解析完成了 都会来调用*/
+    /**
+     * 所有数据解析完成了 都会来调用
+     * */
     @Override
     public void doAfterAllAnalysed(AnalysisContext analysisContext) {
         try{
-            if (totalCount.intValue()==0){
+            if (totalCount.intValue()==0){ //导入模板没有一条数据
                 throw new ExcelException("模板不正确或者未填写信息，请确认");
             }
-            invokeMethod();
+            //不满BATCH_COUNT的数据在这里处理
+            if (!ObjectUtils.isEmpty(list)){
+                invokeMethod();
+                list.clear();
+            }
             log.info("解析完所有数据,共导入{}条数据",totalCount.intValue());
         }catch (Exception e){
             e.printStackTrace();
@@ -120,7 +177,10 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
         }
     }
 
-    public void invokeMethod() throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+    /**
+     * 调用指定方法处理导入的数据
+     */
+    public void invokeMethod() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         //从ApplicationContext中取出已创建好的的对象
         //不可直接反射创建service对象，因为反射创建出来的对象无法实例化dao接口
         ApplicationContext applicationContext = SpringBootBeanUtil.getApplicationContext();

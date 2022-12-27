@@ -2,11 +2,13 @@ package com.qzx.excel.utils;
 
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
+import com.alibaba.excel.annotation.ExcelProperty;
 import com.alibaba.excel.enums.WriteDirectionEnum;
 import com.alibaba.excel.support.ExcelTypeEnum;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.alibaba.excel.write.metadata.fill.FillConfig;
 import com.alibaba.excel.write.metadata.fill.FillWrapper;
+import com.qzx.excel.annotation.ExcelNoJudge;
 import com.qzx.excel.excel.ExcelException;
 import com.qzx.excel.listener.ExcelReadListener;
 import lombok.extern.slf4j.Slf4j;
@@ -16,9 +18,11 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -98,18 +102,20 @@ public class EasyExcelUtil {
      * @param <T> 实体类
      * @param s service类
      * @param methodName:service对应的方法
+     * @param tClass 模板类
      * @param condition 调用监听器额外的条件
+     * @param templateHeaderMap 模板表头（从0开始，用来校验上传文件与所需模板是否匹配）
      * @return: 是否成功
      * @author: qc
      * @time: 2021/5/25 14:01
      */
-    public static <T> boolean importExcel(InputStream file,Class<?> s,String methodName,Class<T> tClass,Map<String,Object> condition) throws Exception {
+    public static <T> boolean importExcel(InputStream file,Class<?> s,String methodName,Class<T> tClass,Map<String,Object> condition,Map<Integer,String > templateHeaderMap) throws Exception {
         try{
             log.info("开始解析excel文件");
             // 这里 需要指定读用哪个class去读，然后读取第一个sheet 文件流会自动关闭
             // EasyExcel.read(fileName, DemoData.class, new DemoDataListener()).sheet().doRead();
             /*doReadAll()读取所有sheet页*/
-            EasyExcel.read(file,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass)).doReadAll();
+            EasyExcel.read(file,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass,templateHeaderMap)).doReadAll();
             log.info("解析excel文件成功");
             return true;
         }catch (ExcelException e){
@@ -129,6 +135,55 @@ public class EasyExcelUtil {
             }
         }
     }
+
+    /**
+     *
+     *
+     * @description: 对导入的excel文件进行操作
+     * @param file：读取的excel文件
+     * @param <T> 实体类
+     * @param s service类
+     * @param methodName:service对应的方法
+     * @param condition 调用监听器额外的条件
+     * @return: 是否成功
+     * @author: qc
+     * @time: 2021/5/25 14:01
+     */
+    public static <T> boolean importExcel(InputStream file,Class<?> s,String methodName,Class<T> tClass,Map<String,Object> condition) throws Exception {
+        try{
+            log.info("开始解析excel文件");
+            // 这里 需要指定读用哪个class去读，然后读取第一个sheet 文件流会自动关闭
+            // EasyExcel.read(fileName, DemoData.class, new DemoDataListener()).sheet().doRead();
+            /*doReadAll()读取所有sheet页*/
+            EasyExcel.read(file,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass)).doReadAll();
+            log.info("解析excel文件成功");
+            return true;
+        }catch (ExcelException e){
+            log.error("导入模板有误");
+            throw new ExcelException(e.getMessage());
+        } catch (Exception e){
+            e.printStackTrace();
+            log.error("解析excel文件异常");
+            throw new Exception("文件解析异常，只支持xlsx/xsl格式");
+        }finally {
+            if(file!=null){
+                try {
+                    file.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+    /**
+     * 通过文件名导入excel
+     * @param fileName 文件名
+     * @param s 被调用处理方法的类对象（需要被spring托管）
+     * @param methodName 被调用处理方法
+     * @param tClass 模板类
+     * @param condition 处理条件
+     * @throws Exception
+     */
     public static <T> boolean importExcel(String fileName,Class<?> s,String methodName,Class<T> tClass,Map<String,Object> condition) throws Exception {
         try{
             log.info("开始解析excel文件");
@@ -136,6 +191,35 @@ public class EasyExcelUtil {
             // EasyExcel.read(fileName, DemoData.class, new DemoDataListener()).sheet().doRead();
             /*doReadAll()读取所有sheet页*/
             EasyExcel.read(fileName,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass)).doReadAll();
+            log.info("解析excel文件成功");
+            return true;
+        }catch (ExcelException e){
+            log.error("导入模板有误");
+            throw new ExcelException(e.getMessage());
+        } catch (Exception e){
+            e.printStackTrace();
+            log.error("解析excel文件异常");
+            throw new Exception("文件解析异常，只支持xlsx/xsl格式");
+        }
+    }
+
+    /**
+     * 通过文件名导入excel
+     * @param fileName 文件名
+     * @param s 被调用处理方法的类对象（需要被spring托管）
+     * @param methodName 被调用处理方法
+     * @param tClass 模板类
+     * @param condition 处理条件
+     * @param templateHeaderMap 模板头（从0开始，用来校验上传文件与所需模板是否匹配）
+     * @throws Exception
+     */
+    public static <T> boolean importExcel(String fileName,Class<?> s,String methodName,Class<T> tClass,Map<String,Object> condition,Map<Integer,String> templateHeaderMap) throws Exception {
+        try{
+            log.info("开始解析excel文件");
+            // 这里 需要指定读用哪个class去读，然后读取第一个sheet 文件流会自动关闭
+            // EasyExcel.read(fileName, DemoData.class, new DemoDataListener()).sheet().doRead();
+            /*doReadAll()读取所有sheet页*/
+            EasyExcel.read(fileName,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass,templateHeaderMap)).doReadAll();
             log.info("解析excel文件成功");
             return true;
         }catch (ExcelException e){
@@ -318,6 +402,40 @@ public class EasyExcelUtil {
     public static boolean complexExportMoreSheet(String importFile,String exportFileName,OutputStream outputStream,Map<Integer,Map<String,Object>> importContent){
         InputStream file=IOUtil.getInputStreamFromClassPath(importFile);
         return complexExportMoreSheet(file,exportFileName,outputStream,importContent);
+    }
+
+    /**
+     * 获取指定模板的含有ExcelProperty的属性并封装成map
+     * @param t
+     * @return
+     */
+    public static Map<Integer,String> headMap(Class<?> t){
+        Map<Integer,String > headMap = new ConcurrentHashMap<>();
+        final Field[] fields = t.getDeclaredFields();
+        for (Field field : fields) {
+            final ExcelProperty property = field.getAnnotation(ExcelProperty.class);
+            if (property!=null){
+                headMap.put(property.index(),property.value()[0]);
+            }
+        }
+        return headMap;
+    }
+    /**
+     * 获取指定模板的含有ExcelProperty且不含有ExcelNoJudge注解的属性并封装成map
+     * @param t
+     * @return
+     */
+    public static Map<Integer,String> headMapWithoutNoJudge(Class<?> t){
+        Map<Integer,String > headMap = new ConcurrentHashMap<>();
+        final Field[] fields = t.getDeclaredFields();
+        for (Field field : fields) {
+            final ExcelProperty property = field.getAnnotation(ExcelProperty.class);
+            final ExcelNoJudge judge = field.getAnnotation(ExcelNoJudge.class);
+            if (property!=null&&judge==null){
+                headMap.put(property.index(),property.value()[0]);
+            }
+        }
+        return headMap;
     }
 
 }
