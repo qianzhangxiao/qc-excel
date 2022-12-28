@@ -17,6 +17,7 @@ springboot+easy excel
 1. maven打包至本地仓库或其他私有仓库
 2. 导入qcexcel-spring-boot-starter依赖
 
+代码1：使用类
 ~~~ java
 @Override
     public void importExcel(MultipartFile file) {
@@ -24,6 +25,7 @@ springboot+easy excel
             Map<Integer,String > headMap = new ConcurrentHashMap<>();
             headMap.put(0,"账号");
             headMap.put(1,"用户名");
+            // importExcel见代码2
             EasyExcelUtil.importExcel(file.getInputStream(),importExcel.getClass(),"importFile", UserInfo.class,null,headMap);
         } catch (Exception e) {
             e.printStackTrace();
@@ -132,6 +134,27 @@ springboot+easy excel
             e.printStackTrace();
         }
     }
+~~~
+
+代码2：导入类-ImportServiceImpl
+~~~ java
+package com.zzuhkp.easyexcel.service.impl;
+
+import com.zzuhkp.easyexcel.model.UserInfo;
+import com.zzuhkp.easyexcel.service.ImportService;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class ImportServiceImpl implements ImportService {
+    @Override
+    public void importFile(List<UserInfo> list, Map<String, Object> condition) {
+        list.forEach(System.out::println);
+    }
+}
+
 ~~~
 
 #### 参与贡献
