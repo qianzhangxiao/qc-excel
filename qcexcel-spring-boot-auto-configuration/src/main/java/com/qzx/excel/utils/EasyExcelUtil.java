@@ -115,7 +115,7 @@ public class EasyExcelUtil {
             // 这里 需要指定读用哪个class去读，然后读取第一个sheet 文件流会自动关闭
             // EasyExcel.read(fileName, DemoData.class, new DemoDataListener()).sheet().doRead();
             /*doReadAll()读取所有sheet页*/
-            EasyExcel.read(file,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass,templateHeaderMap)).doReadAll();
+            EasyExcel.read(file,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass,templateHeaderMap)).autoCloseStream(true).doReadAll();
             log.info("解析excel文件成功");
             return true;
         }catch (ExcelException e){
@@ -125,14 +125,6 @@ public class EasyExcelUtil {
             e.printStackTrace();
             log.error("解析excel文件异常");
             throw new Exception("文件解析异常，只支持xlsx/xsl格式");
-        }finally {
-            if(file!=null){
-                try {
-                    file.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
         }
     }
 
@@ -155,7 +147,7 @@ public class EasyExcelUtil {
             // 这里 需要指定读用哪个class去读，然后读取第一个sheet 文件流会自动关闭
             // EasyExcel.read(fileName, DemoData.class, new DemoDataListener()).sheet().doRead();
             /*doReadAll()读取所有sheet页*/
-            EasyExcel.read(file,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass)).doReadAll();
+            EasyExcel.read(file,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass)).autoCloseStream(true).doReadAll();
             log.info("解析excel文件成功");
             return true;
         }catch (ExcelException e){
@@ -165,14 +157,6 @@ public class EasyExcelUtil {
             e.printStackTrace();
             log.error("解析excel文件异常");
             throw new Exception("文件解析异常，只支持xlsx/xsl格式");
-        }finally {
-            if(file!=null){
-                try {
-                    file.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
         }
     }
     /**
@@ -190,7 +174,7 @@ public class EasyExcelUtil {
             // 这里 需要指定读用哪个class去读，然后读取第一个sheet 文件流会自动关闭
             // EasyExcel.read(fileName, DemoData.class, new DemoDataListener()).sheet().doRead();
             /*doReadAll()读取所有sheet页*/
-            EasyExcel.read(fileName,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass)).doReadAll();
+            EasyExcel.read(fileName,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass)).autoCloseStream(true).doReadAll();
             log.info("解析excel文件成功");
             return true;
         }catch (ExcelException e){
@@ -219,7 +203,7 @@ public class EasyExcelUtil {
             // 这里 需要指定读用哪个class去读，然后读取第一个sheet 文件流会自动关闭
             // EasyExcel.read(fileName, DemoData.class, new DemoDataListener()).sheet().doRead();
             /*doReadAll()读取所有sheet页*/
-            EasyExcel.read(fileName,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass,templateHeaderMap)).doReadAll();
+            EasyExcel.read(fileName,tClass,new ExcelReadListener<T>(s,methodName,condition,tClass,templateHeaderMap)).autoCloseStream(true).doReadAll();
             log.info("解析excel文件成功");
             return true;
         }catch (ExcelException e){
@@ -246,8 +230,8 @@ public class EasyExcelUtil {
      * @param t 导出模板的实体类
      * @param map 需要添加下拉菜单的列，列从0开始,value-->String[]为具体下拉菜单的值
      */
-    public static<T> void exportTemplate(HttpServletResponse response,String templateName,String sheetName,T t,Map<Integer,String[]> map) throws IOException {
-        EasyExcel.write(getOutPutStream(response,templateName), t.getClass())
+    public static<T> void exportTemplate(HttpServletResponse response,String templateName,String sheetName,Class<T> tClass,Map<Integer,String[]> map) throws IOException {
+        EasyExcel.write(getOutPutStream(response,templateName), tClass)
                 .registerWriteHandler(new SelfWriteHandle(map))
                 .sheet(sheetName)
                 .doWrite(new ArrayList<>());
@@ -265,6 +249,7 @@ public class EasyExcelUtil {
                                               InputStream templateStream,Map<Integer,String[]> fillData) throws IOException {
         EasyExcel.write(getOutPutStream(response,templateName))
                 .withTemplate(templateStream)
+                .autoCloseStream(true) //自动关闭流
                 .registerWriteHandler(new SelfWriteHandle(fillData))
                 .sheet(sheetName)
                 .doWrite(new ArrayList<>());
@@ -290,8 +275,8 @@ public class EasyExcelUtil {
      * @param response 返回响应
      * @param importContent 模板所需数据
      */
-    public static boolean complexExport(InputStream importFile,String exportFileName,String sheetName,HttpServletResponse response,Map<String,Object> importContent) throws IOException {
-        return complexExport(importFile,exportFileName,sheetName,getOutPutStream(response,exportFileName),importContent);
+    public static void complexExport(InputStream importFile,String exportFileName,String sheetName,HttpServletResponse response,Map<String,Object> importContent) throws IOException {
+        complexExport(importFile,exportFileName,sheetName,getOutPutStream(response,exportFileName),importContent);
     }
     /**
      * 单sheet页复杂模板导出
@@ -301,9 +286,9 @@ public class EasyExcelUtil {
      * @param outputStream 输出流
      * @param importContent 模板所需数据
      */
-    public static boolean complexExport(InputStream importFile,String exportFileName,String sheetName,OutputStream outputStream,Map<String,Object> importContent){
+    public static void complexExport(InputStream importFile,String exportFileName,String sheetName,OutputStream outputStream,Map<String,Object> importContent){
         ExcelWriter writer= null;
-        writer = EasyExcel.write(outputStream).withTemplate(importFile).build();
+        writer = EasyExcel.write(outputStream).withTemplate(importFile).autoCloseStream(true).build();
         WriteSheet writeSheet=EasyExcel.writerSheet(0,sheetName).registerWriteHandler(new MyHeader()).build();
         FillConfig fillConfig=FillConfig.builder().direction(WriteDirectionEnum.VERTICAL).forceNewRow(Boolean.TRUE).build();
         ExcelWriter finalWriter = writer;
@@ -316,7 +301,6 @@ public class EasyExcelUtil {
             }
         });
         writer.finish();
-        return true;
     }
 
     /**
@@ -326,9 +310,9 @@ public class EasyExcelUtil {
      * @param outputStream 输出流
      * @param importContent key为sheet页码，从0开始，value为sheet页填充所需数据
      */
-    public static boolean complexExportMoreSheet(InputStream importFile,String exportFileName,OutputStream outputStream,Map<Integer,Map<String,Object>> importContent){
+    public static void complexExportMoreSheet(InputStream importFile,String exportFileName,OutputStream outputStream,Map<Integer,Map<String,Object>> importContent){
         ExcelWriter writer= null;
-        writer = EasyExcel.write(outputStream).withTemplate(importFile).build();
+        writer = EasyExcel.write(outputStream).withTemplate(importFile).autoCloseStream(true).build();
         ExcelWriter finalWriter = writer;
         importContent.forEach((sheetNo, sheetContent)->{
             WriteSheet writeSheet=EasyExcel.writerSheet(sheetNo).registerWriteHandler(new MyHeader()).build();
@@ -343,7 +327,6 @@ public class EasyExcelUtil {
             });
         });
         writer.finish();
-        return true;
     }
 
     /**
@@ -353,8 +336,8 @@ public class EasyExcelUtil {
      * @param response 输出流
      * @param importContent key为sheet页码，从0开始，value为sheet页填充所需数据
      */
-    public static boolean complexExportMoreSheet(InputStream importFile,String exportFileName,HttpServletResponse response,Map<Integer,Map<String,Object>> importContent) throws IOException {
-        return complexExportMoreSheet(importFile,exportFileName,getOutPutStream(response,exportFileName),importContent);
+    public static void complexExportMoreSheet(InputStream importFile,String exportFileName,HttpServletResponse response,Map<Integer,Map<String,Object>> importContent) throws IOException {
+        complexExportMoreSheet(importFile,exportFileName,getOutPutStream(response,exportFileName),importContent);
     }
 
     /**
@@ -365,9 +348,9 @@ public class EasyExcelUtil {
      * @param response 返回响应
      * @param importContent 模板所需数据
      */
-    public static boolean complexExport(String importFile,String exportFileName,String sheetName,HttpServletResponse response,Map<String,Object> importContent) throws IOException {
+    public static void complexExport(String importFile,String exportFileName,String sheetName,HttpServletResponse response,Map<String,Object> importContent) throws IOException {
         InputStream file=IOUtil.getInputStreamFromClassPath(importFile);
-        return complexExport(file,exportFileName,sheetName,response,importContent);
+        complexExport(file,exportFileName,sheetName,response,importContent);
     }
     /**
      * 单sheet页复杂模板导出，模板位于项目classpath环境下
@@ -377,9 +360,9 @@ public class EasyExcelUtil {
      * @param outputStream 输出流
      * @param importContent 模板所需数据
      */
-    public static boolean complexExport(String importFile,String exportFileName,String sheetName,OutputStream outputStream,Map<String,Object> importContent){
+    public static void complexExport(String importFile,String exportFileName,String sheetName,OutputStream outputStream,Map<String,Object> importContent){
         InputStream file=IOUtil.getInputStreamFromClassPath(importFile);
-        return complexExport(file,exportFileName,sheetName,outputStream,importContent);
+        complexExport(file,exportFileName,sheetName,outputStream,importContent);
     }
     /**
      * 多sheet页复杂模板导出，模板位于项目classpath环境下
@@ -388,9 +371,9 @@ public class EasyExcelUtil {
      * @param response 返回响应
      * @param importContent key为sheet页码，从0开始，value为sheet页填充所需数据
      */
-    public static boolean complexExportMoreSheet(String importFile,String exportFileName,HttpServletResponse response,Map<Integer,Map<String,Object>> importContent) throws IOException {
+    public static void complexExportMoreSheet(String importFile,String exportFileName,HttpServletResponse response,Map<Integer,Map<String,Object>> importContent) throws IOException {
         InputStream file=IOUtil.getInputStreamFromClassPath(importFile);
-        return complexExportMoreSheet(file,exportFileName,response,importContent);
+        complexExportMoreSheet(file,exportFileName,response,importContent);
     }
     /**
      * 多sheet页复杂模板导出，模板位于项目classpath环境下
@@ -399,9 +382,9 @@ public class EasyExcelUtil {
      * @param outputStream 输出流
      * @param importContent key为sheet页码，从0开始，value为sheet页填充所需数据
      */
-    public static boolean complexExportMoreSheet(String importFile,String exportFileName,OutputStream outputStream,Map<Integer,Map<String,Object>> importContent){
+    public static void complexExportMoreSheet(String importFile,String exportFileName,OutputStream outputStream,Map<Integer,Map<String,Object>> importContent){
         InputStream file=IOUtil.getInputStreamFromClassPath(importFile);
-        return complexExportMoreSheet(file,exportFileName,outputStream,importContent);
+        complexExportMoreSheet(file,exportFileName,outputStream,importContent);
     }
 
     /**

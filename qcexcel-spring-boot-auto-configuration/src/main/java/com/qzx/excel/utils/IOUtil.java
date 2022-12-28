@@ -127,14 +127,12 @@ public class IOUtil {
      */
     public static InputStream getInputStreamFromClassPath(String file){
         ClassPathResource classPathResource = new ClassPathResource(file);
-        InputStream inputStream =null;
         try {
-            inputStream= classPathResource.getInputStream();
-
+            is = classPathResource.getInputStream();
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return inputStream;
+        return is;
     }
     private static String getPath(String path){
         if(path.endsWith("/")||path.endsWith("\\")){
@@ -143,21 +141,38 @@ public class IOUtil {
         return path+"/";
     }
 
-    public static void closeIo(){
+    public static void closeIo(BufferedInputStream bis){
+        try {
+            if(bis!=null){
+                bis.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    public static void closeIo(InputStream is){
         try {
             if(is!=null){
                 is.close();
             }
-            if(bis!=null){
-                bis.close();
-            }
-            if(os!=null){
-                os.close();
-            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    public static void closeIo(BufferedOutputStream bos){
+        try {
             if(bos!=null){
                 bos.close();
             }
-
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    public static void closeIo(OutputStream os){
+        try {
+            if(os!=null){
+                os.close();
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
