@@ -11,6 +11,9 @@ import org.springframework.context.annotation.Configuration;
 @ConditionalOnWebApplication//引用启动器的项目是web应用此自动配置模块才生效
 public class EasyExcelAutoConfiguration {
 
+    /**
+     * 一次批量导入数量控制，如果配置文件没有配置qc.excel.batchCount，则默认一次导入5条
+     */
     @Value("${qc.excel.batchCount:5}")
     private Integer batchCount;
 
