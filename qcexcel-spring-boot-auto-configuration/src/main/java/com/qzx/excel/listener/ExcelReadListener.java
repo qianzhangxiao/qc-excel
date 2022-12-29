@@ -4,12 +4,14 @@ import com.alibaba.excel.annotation.ExcelProperty;
 import com.alibaba.excel.context.AnalysisContext;
 import com.alibaba.excel.event.AnalysisEventListener;
 import com.qzx.excel.annotation.ExcelNoJudge;
+import com.qzx.excel.config.ExcelProperties;
 import com.qzx.excel.excel.ExcelException;
 import com.qzx.excel.utils.SpringBootBeanUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
 import org.springframework.util.ObjectUtils;
 
+import javax.annotation.Resource;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -53,6 +55,8 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
      * 每隔BATCH_COUNT条存储数据库，实际使用中可以3000条，然后清理list ，方便内存回收
      */
     private static final int BATCH_COUNT = 5;
+
+    private ExcelProperties excelProperties;
     /**
      * 导入总量
      */
@@ -73,6 +77,7 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
         this.methodName=methodName;
         this.map=map;
         this.t = t;
+        excelProperties = (ExcelProperties)SpringBootBeanUtil.getBean("excelProperties");
     }
     /**
      *
@@ -86,6 +91,7 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
         this.map=map;
         this.t = t;
         this.templateHeaderMap = templateHeaderMap;
+        excelProperties = (ExcelProperties)SpringBootBeanUtil.getBean("excelProperties");
     }
 
 
@@ -144,7 +150,7 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
         try{
             totalCount.incrementAndGet();
             list.add(t);
-            if(list.size()>=BATCH_COUNT){ //满BATCH_COUNT处理一次，分批次处理减轻压力
+            if(list.size()>=excelProperties.getBatchCount()){ //满BATCH_COUNT处理一次，分批次处理减轻压力
                 invokeMethod();
                 // 存储完成清理 list
                 list.clear();

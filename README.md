@@ -16,6 +16,10 @@ springboot+easy excel
 
 1. maven打包至本地仓库或其他私有仓库
 2. 导入qcexcel-spring-boot-starter依赖
+3. 设置批量一次处理的数量，配置文件新增,不增加配置默认为5
+~~~ properties
+qc.excel.batchCount=xx
+~~~
 
 代码1：使用类
 ~~~ java
