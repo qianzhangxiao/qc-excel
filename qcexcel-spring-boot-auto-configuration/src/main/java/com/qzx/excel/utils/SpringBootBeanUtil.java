@@ -3,7 +3,6 @@ package com.qzx.excel.utils;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
-import org.springframework.stereotype.Component;
 
 /**
  * @description: 获取spring托管对象
