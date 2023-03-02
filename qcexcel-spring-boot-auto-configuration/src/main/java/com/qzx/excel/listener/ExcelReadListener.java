@@ -64,6 +64,10 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
      * 保存导入的数据
      */
     List<T> list = new ArrayList<>();
+    /**
+     * 判断是否是隐藏sheet，隐藏sheet无需导入
+     */
+    private boolean isPrivate;
 
     /**
      *
@@ -77,6 +81,7 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
         this.map=map;
         this.t = t;
         excelProperties = (ExcelProperties)SpringBootBeanUtil.getBean("excelProperties");
+        this.isPrivate = false;
     }
     /**
      *
@@ -91,6 +96,7 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
         this.t = t;
         this.templateHeaderMap = templateHeaderMap;
         excelProperties = (ExcelProperties)SpringBootBeanUtil.getBean("excelProperties");
+        this.isPrivate = false;
     }
 
 
@@ -101,11 +107,15 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
      */
     @Override
     public void invokeHeadMap(Map<Integer, String> headMap, AnalysisContext context) {
-        if (!ObjectUtils.isEmpty(templateHeaderMap)){
-            headerMapJudge(headMap);
-        }else{
-            headerFieldJudge(headMap);
+        isPrivate=context.readSheetHolder().getSheetName().contains("PrivateSheetHidden");
+        if (!isPrivate){
+            if (!ObjectUtils.isEmpty(templateHeaderMap)){
+                headerMapJudge(headMap);
+            }else{
+                headerFieldJudge(headMap);
+            }
         }
+
     }
 
     private void headerMapJudge(Map<Integer,String >headMap){
@@ -146,17 +156,19 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
      * */
     @Override
     public void invoke(T t, AnalysisContext analysisContext) {
-        try{
-            totalCount.incrementAndGet();
-            list.add(t);
-            if(list.size()>=excelProperties.getBatchCount()){ //满BATCH_COUNT处理一次，分批次处理减轻压力
-                invokeMethod();
-                // 存储完成清理 list
-                list.clear();
+        if (!isPrivate){
+            try{
+                totalCount.incrementAndGet();
+                list.add(t);
+                if(list.size()>=excelProperties.getBatchCount()){ //满BATCH_COUNT处理一次，分批次处理减轻压力
+                    invokeMethod();
+                    // 存储完成清理 list
+                    list.clear();
+                }
+            }catch (Exception e){
+                e.printStackTrace();
+                throw new ExcelException(e.getMessage());
             }
-        }catch (Exception e){
-            e.printStackTrace();
-            throw new ExcelException(e.getMessage());
         }
     }
 
@@ -165,20 +177,22 @@ public class ExcelReadListener<T> extends AnalysisEventListener<T> {
      * */
     @Override
     public void doAfterAllAnalysed(AnalysisContext analysisContext) {
-        try{
-            if (totalCount.intValue()==0){ //导入模板没有一条数据
-                throw new ExcelException("模板不正确或者未填写信息，请确认");
+        if (!isPrivate){
+            try{
+                if (totalCount.intValue()==0){ //导入模板没有一条数据
+                    throw new ExcelException("模板不正确或者未填写信息，请确认");
+                }
+                //不满BATCH_COUNT的数据在这里处理
+                if (!ObjectUtils.isEmpty(list)){
+                    invokeMethod();
+                    list.clear();
+                }
+                log.info("解析完所有数据,共导入{}条数据",totalCount.intValue());
+            }catch (Exception e){
+                e.printStackTrace();
+                log.info("解析数据出错");
+                throw new ExcelException(e.getMessage());
             }
-            //不满BATCH_COUNT的数据在这里处理
-            if (!ObjectUtils.isEmpty(list)){
-                invokeMethod();
-                list.clear();
-            }
-            log.info("解析完所有数据,共导入{}条数据",totalCount.intValue());
-        }catch (Exception e){
-            e.printStackTrace();
-            log.info("解析数据出错");
-            throw new ExcelException(e.getMessage());
         }
     }
 

@@ -34,7 +34,7 @@ public class SelfWriteHandle implements SheetWriteHandler {
         DataValidationHelper helper = sheet.getDataValidationHelper();
         for (Map.Entry<Integer, String[]> entry : mapDropDown.entrySet()) {
             // 定义sheet的名称
-            String sheetName = "SheetHidden" + entry.getKey();
+            String sheetName = "PrivateSheetHidden" + entry.getKey();
             // 1.创建一个隐藏的sheet 名称为 privateSheet
             Sheet privateSheet = workbook.createSheet(sheetName);
             // 设置隐藏
